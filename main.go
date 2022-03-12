@@ -10,6 +10,7 @@ import (
 	_ "github.com/marcboeker/go-duckdb"
 	"math/rand"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"syscall"
 )
@@ -28,20 +29,21 @@ func csvFifo(records uint64, columns []uint64) string {
 	errPanic(syscall.Mkfifo(fname, 0666))
 	var file, err = os.OpenFile(fname, os.O_RDWR, 0666)
 	errPanic(err)
-	var f = bufio.NewWriter(file)
+	var w = bufio.NewWriter(file)
 	var rnd = rand.New(rand.NewSource(int64(idx)))
 	go func() {
+		var buf []byte
 		for record := uint64(0); records == 0 || record < records; record++ {
-			_, err = fmt.Fprintf(f, "%d", record)
-			errPanic(err)
+			buf = strconv.AppendUint(buf[:0], record, 10)
 			for _, max := range columns {
-				_, err = fmt.Fprintf(f, ",%d", rnd.Uint64()%max)
-				errPanic(err)
+				buf = append(buf, ',')
+				buf = strconv.AppendUint(buf, rnd.Uint64()%max, 10)
 			}
-			_, err = fmt.Fprint(f, "\n")
+			buf = append(buf, '\n')
+			_, err = w.Write(buf)
 			errPanic(err)
 		}
-		errPanic(f.Flush())
+		errPanic(w.Flush())
 		errPanic(file.Close())
 	}()
 	return fname
@@ -52,12 +54,10 @@ func main() {
 	errPanic(err)
 	defer db.Close()
 
-	var transactions = csvFifo(100000, []uint64{1000, 1000})
-	var users = csvFifo(10000, []uint64{1000})
-	//var item = csvFifo(1000, []uint64{1000})
+	var transactions = csvFifo(100*1000*1000, []uint64{1000})
+	//var users = csvFifo(10000, []uint64{1000})
 
-	//time.Sleep(time.Second * 1000)
-	var query = fmt.Sprintf(`SELECT AVG(U.column1::INT) from read_csv_auto('%[1]s') T JOIN read_csv_auto('%[2]s') U ON T.column1 = U.column0`, transactions, users)
+	var query = fmt.Sprintf("select fsum(column1) from read_csv('%s', DELIM=',', HEADER=False, COLUMNS={'columl0': 'INT', 'column1': 'INT'})", transactions)
 
 	var rows *sql.Rows
 	rows, err = db.Query(query)
