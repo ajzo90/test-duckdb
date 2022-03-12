@@ -8,9 +8,11 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/marcboeker/go-duckdb"
+	"log"
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -51,24 +53,51 @@ func csvFifo(records uint64, columns []uint64) string {
 }
 
 func main() {
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Fatalf("panicked with err:%v, perhaps you forgot to 'rm /var/tmp/duck.db' or 'rm csv*'?\n", err)
+		}
+	}()
+
 	var db, err = sql.Open("duckdb", "/var/tmp/duck.db")
 	errPanic(err)
 	defer db.Close()
 
-	//var users = csvFifo(10000, []uint64{1000})
+	var readCsv = "read_csv('%s', DELIM=',', HEADER=False, COLUMNS={'id': 'INT', 'usr': 'INT', 'item': 'INT', 'ts': 'INT', 'quantity':'INT'})"
+	var key, val = "usr", "quantity"
 
-	var exec = func(format string, a ...interface{}) {
+	var renderQ = func(q string, optionalTbl ...interface{}) string {
+		q = strings.ReplaceAll(q, "{key}", key)
+		q = strings.ReplaceAll(q, "{val}", val)
+		q = strings.ReplaceAll(q, "{csv}", fmt.Sprintf(readCsv, optionalTbl...))
+		return q
+	}
+
+	var transactions = func() string {
+		// id,user,item,ts,quantity
+		return csvFifo(100_000_000, []uint64{1_000_000, 1_000, 1_000, 10})
+	}
+
+	if f := os.Getenv("CSVFILE"); f != "" {
+		// use external file instead
+		readCsv = "read_csv('%s', DELIM=',', HEADER=True, COLUMNS={'usr': 'UINT64', 'item': 'UINT64', 'ts': 'INT32', 'quantity': 'INT32'})"
+		transactions = func() string {
+			return f
+		}
+	}
+
+	var exec = func(format string, optionalTbl ...interface{}) {
 		var t0 = time.Now()
-		var q = fmt.Sprintf(format, a...)
+		var q = renderQ(format, optionalTbl...)
 		_, err = db.Exec(q)
 		errPanic(err)
 		fmt.Println(q, time.Since(t0))
 	}
 
-	var query = func(format string, a ...interface{}) {
+	var query = func(format string, optionalTbl ...interface{}) {
 		var t0 = time.Now()
-		var q = fmt.Sprintf(format, a...)
-
+		var q = renderQ(format, optionalTbl...)
 		var rows *sql.Rows
 		rows, err = db.Query(q)
 		errPanic(err)
@@ -91,22 +120,22 @@ func main() {
 		errPanic(rows.Err())
 		fmt.Println(q, time.Since(t0))
 	}
-	
-	var transactions = func() string {
-		return csvFifo(100_000_000, []uint64{1_000_000})
-	}
 
-	exec("create table x as select * from read_csv('%s', DELIM=',', HEADER=False, COLUMNS={'column0': 'INT32', 'column1': 'INT32'})", transactions())
-
+	exec("create table x(usr INT NOT NULL,item INT NOT NULL, ts INT NOT NULL, quantity INT NOT NULL)")
+	exec("insert into x select (usr>>34)::int, (item>>34)::int, ts, quantity from {csv}", transactions()) // x>>34: tried to use smaller types, not a lot of improvements..
 	exec("COPY x TO 'x.parquet' (FORMAT 'PARQUET', CODEC 'ZSTD')")
 
+	// from db
 	for i := 0; i < 3; i++ {
-		query("select column1, fsum(column0) v from x where column1 > 10 group by column1 order by v desc limit 1")
-	}
-	for i := 0; i < 3; i++ {
-		query("select column1, fsum(column0) v from 'x.parquet' where column1 > 10 group by column1 order by v desc limit 1")
+		query("select {key}, count({val}) v from x where {key} < 10 group by {key} order by v desc limit 3")
 	}
 
-	query("select  column1, fsum(column0) v from read_csv('%s', DELIM=',', HEADER=False, COLUMNS={'column0': 'INT32', 'column1': 'INT32'}) where column1 > 10 group by column1 order by v desc limit 1", transactions())
+	// from parquet file
+	for i := 0; i < 3; i++ {
+		query("select {key}, count({val}) v from 'x.parquet' where {key} < 10 group by {key} order by v desc limit 3")
+	}
+
+	// from csv (slow)
+	//query("select {key}, count({val}) v from {csv} where {key} > 10 group by {key} order by v desc limit 1", transactions())
 
 }
