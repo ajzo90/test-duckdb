@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 func errPanic(err error) {
@@ -54,29 +55,58 @@ func main() {
 	errPanic(err)
 	defer db.Close()
 
-	var transactions = csvFifo(100*1000*1000, []uint64{1000})
 	//var users = csvFifo(10000, []uint64{1000})
 
-	var query = fmt.Sprintf("select fsum(column1) from read_csv('%s', DELIM=',', HEADER=False, COLUMNS={'columl0': 'INT', 'column1': 'INT'})", transactions)
-
-	var rows *sql.Rows
-	rows, err = db.Query(query)
-	errPanic(err)
-
-	var nRows []string
-	nRows, err = rows.Columns()
-	errPanic(err)
-	var bufferPointers = make([]interface{}, len(nRows))
-	var buffer = make([]interface{}, len(nRows))
-	for i := range buffer {
-		bufferPointers[i] = &buffer[i]
+	var exec = func(format string, a ...interface{}) {
+		var t0 = time.Now()
+		var q = fmt.Sprintf(format, a...)
+		_, err = db.Exec(q)
+		errPanic(err)
+		fmt.Println(q, time.Since(t0))
 	}
-	for rows.Next() {
-		errPanic(rows.Scan(bufferPointers...))
+
+	var query = func(format string, a ...interface{}) {
+		var t0 = time.Now()
+		var q = fmt.Sprintf(format, a...)
+
+		var rows *sql.Rows
+		rows, err = db.Query(q)
+		errPanic(err)
+
+		var nRows []string
+		nRows, err = rows.Columns()
+		errPanic(err)
+		var bufferPointers = make([]interface{}, len(nRows))
+		var buffer = make([]interface{}, len(nRows))
 		for i := range buffer {
-			fmt.Printf("%v ", buffer[i])
+			bufferPointers[i] = &buffer[i]
 		}
-		fmt.Println()
+		for rows.Next() {
+			errPanic(rows.Scan(bufferPointers...))
+			for i := range buffer {
+				fmt.Printf("%v ", buffer[i])
+			}
+			fmt.Println()
+		}
+		errPanic(rows.Err())
+		fmt.Println(q, time.Since(t0))
 	}
-	errPanic(rows.Err())
+	
+	var transactions = func() string {
+		return csvFifo(100_000_000, []uint64{1_000_000})
+	}
+
+	exec("create table x as select * from read_csv('%s', DELIM=',', HEADER=False, COLUMNS={'column0': 'INT32', 'column1': 'INT32'})", transactions())
+
+	exec("COPY x TO 'x.parquet' (FORMAT 'PARQUET', CODEC 'ZSTD')")
+
+	for i := 0; i < 3; i++ {
+		query("select column1, fsum(column0) v from x where column1 > 10 group by column1 order by v desc limit 1")
+	}
+	for i := 0; i < 3; i++ {
+		query("select column1, fsum(column0) v from 'x.parquet' where column1 > 10 group by column1 order by v desc limit 1")
+	}
+
+	query("select  column1, fsum(column0) v from read_csv('%s', DELIM=',', HEADER=False, COLUMNS={'column0': 'INT32', 'column1': 'INT32'}) where column1 > 10 group by column1 order by v desc limit 1", transactions())
+
 }
