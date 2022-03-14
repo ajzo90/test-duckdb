@@ -9,7 +9,7 @@ mkfifo $PIPE
 
 if [ -t 0 ]; then
     $DUCK_DB -s "select sum(column1) from read_csv_auto('$PIPE')" &
-    echo -e "1,1\n2,2\n3,3" > $PIPE
+    echo -e "0,0\n1,1\n2,2\n3,3\n" > $PIPE
 else
     $DUCK_DB -s "select count(*) from read_csv_auto('$PIPE')" &
     cat - > $PIPE
