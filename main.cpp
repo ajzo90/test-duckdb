@@ -49,6 +49,10 @@ int get_schema(struct ArrowArrayStream *, struct ArrowSchema *out) {
     return 0;
 };
 
+extern "C" {
+    void hello_world();
+}
+
 std::unique_ptr<duckdb::ArrowArrayStreamWrapper>
 CreateStream(uintptr_t, std::pair<std::unordered_map<duckdb::idx_t, duckdb::string>, std::vector<duckdb::string>> &project_columns,
              duckdb::TableFilterCollection *filters = nullptr) {

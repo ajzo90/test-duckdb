@@ -55,11 +55,22 @@ ExternalProject_Get_Property(arrow_ep install_dir)
 set(install_arrow ${install_dir})
 include_directories(${install_arrow}/include)
 
+include(FetchContent)
+
+FetchContent_Declare(
+        Corrosion
+        GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+        GIT_TAG v0.2.1
+)
+FetchContent_MakeAvailable(Corrosion)
+corrosion_import_crate(MANIFEST_PATH rust_arrow_client/Cargo.toml)
+
 add_executable(arrow_duckdb_test main.cpp)
 add_dependencies(arrow_duckdb_test arrow_ep)
 target_link_libraries(arrow_duckdb_test PRIVATE
         duckdb_static
         ${install_arrow}/lib64/libarrow.a
+        rust_arrow_client
         -fsanitize=address
         -fsanitize=undefined
         )

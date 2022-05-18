@@ -3,3 +3,5 @@
 100m.csv
 node_modules
 /cmake-build-*
+/rust_arrow_client/target/
+/build/
