@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include "duckdb.hpp"
+#include <chrono>
 
 extern "C" {
     ArrowArrayStream get_arrow_array_stream();
@@ -10,8 +11,8 @@ extern "C" {
 std::unique_ptr<duckdb::ArrowArrayStreamWrapper>
 CreateStream(uintptr_t, std::pair<std::unordered_map<duckdb::idx_t, duckdb::string>, std::vector<duckdb::string>> &project_columns,
              duckdb::TableFilterCollection *filters = nullptr) {
-    for (duckdb::string i: project_columns.second)
-        printf("%s\n", i.c_str());
+//    for (duckdb::string i: project_columns.second)
+//        printf("%s\n", i.c_str());
 
     auto stream_wrapper = duckdb::make_unique<duckdb::ArrowArrayStreamWrapper>();
     stream_wrapper->arrow_array_stream = get_arrow_array_stream();
@@ -31,7 +32,12 @@ int main() {
     conn.Query("SELECT * FROM t LIMIT 10")->Print();
 //    conn.Query("SELECT SUM(u.b) FROM t JOIN t u ON t.b = u.a")->Print();
     for (std::string line; std::getline(std::cin, line);) {
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         conn.Query(line)->Print();
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms" << std::endl;
     }
     return 0;
 }
+
+//select sum(id) from t group by id limit 1

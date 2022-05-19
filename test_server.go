@@ -1,7 +1,8 @@
 package main
 
 import (
-	"bufio"
+// 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -54,6 +55,8 @@ func Main() error {
 	}))
 }
 
+var cache []byte
+
 func handleStreamRequest(_w io.Writer, r *Req) error {
 
 	fields := model[r.Table]
@@ -63,7 +66,7 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 		return fmt.Errorf("batch can not be 0")
 	}
 	if r.Limit == 0 {
-		r.Limit = 10000
+		r.Limit = 100_000_000
 	}
 
 	var emitters []func(n int) []byte
@@ -71,9 +74,9 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 
 	staticRandomEmitter := func(size int) func(int) []byte {
 		var buf = make([]byte, size*int(r.Batch))
+		var leading_zeros = make([]byte,size/2)
 		return func(n int) []byte {
 			io.ReadFull(rnd, buf)
-			var leading_zeros = make([]byte,size/2)
 			for i := 0; i<int(r.Batch); i++ {
 			    copy(buf[i*size+size-len(leading_zeros):], leading_zeros)
 			}
@@ -125,7 +128,12 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 
 	var batchSizeBuf [4]byte
 
-	w := bufio.NewWriter(_w)
+// 	w := bufio.NewWriter(_w)
+    if len(cache) != 0 {
+        _w.Write(cache)
+        return nil
+    }
+    w := bytes.NewBuffer(nil)
 
 	for capacity := r.Limit; capacity > 0; {
 		toEmit := r.Batch
@@ -150,7 +158,9 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 		return err
 	}
 
-	return w.Flush()
+    cache = w.Bytes()
+    _w.Write(cache)
+	return nil
 }
 func main() {
 	log.Fatalln(Main())

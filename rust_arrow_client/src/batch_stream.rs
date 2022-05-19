@@ -9,7 +9,7 @@ use arrow::record_batch::RecordBatch;
 use serde_json::json;
 use std::io::Read;
 
-const MAX_BATCH_LEN: u32 = 64;
+const MAX_BATCH_LEN: u32 = 100000;
 
 pub struct BatchStream {
     stream: Box<dyn Read + Send>,
