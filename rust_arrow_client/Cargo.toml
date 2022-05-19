@@ -5,6 +5,10 @@ edition = "2021"
 
 [dependencies]
 arrow = "14.0.0"
+serde = { version = "1.0.137", features = ["derive", "rc"] }
+serde_json = "1.0.81"
+ureq = { version="2.4.0", features=["json"]}
+anyhow = "1.0.57"
 
 [lib]
 crate-type = ["cdylib"]

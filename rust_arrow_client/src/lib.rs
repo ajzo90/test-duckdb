@@ -1,6 +1,9 @@
+mod data_model;
+
+use crate::data_model::{DataModel, Table};
 use arrow::array::{ArrayData, ArrayRef, StructArray};
 use arrow::buffer::Buffer;
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::datatypes::{Field, SchemaRef};
 use arrow::error::Result;
 use arrow::ffi_stream::FFI_ArrowArrayStream;
 use arrow::record_batch::{RecordBatch, RecordBatchReader};
@@ -8,22 +11,29 @@ use std::cmp::min;
 
 #[no_mangle]
 pub extern "C" fn get_arrow_array_stream() -> FFI_ArrowArrayStream {
-    FFI_ArrowArrayStream::new(Box::new(IteratorImpl::new()))
+    let base_url = "http://localhost:6789";
+    let data_model = DataModel::get(base_url).unwrap();
+    let table = data_model.table("transactions").unwrap();
+    FFI_ArrowArrayStream::new(Box::new(IteratorImpl::new(base_url, table)))
 }
 
 struct IteratorImpl {
     cnt: usize,
+    base_url: String,
+    table: Table,
     schema: SchemaRef,
 }
 
 impl IteratorImpl {
-    fn new() -> Self {
+    fn new(base_url: &str, table: &Table) -> Self {
+        let table = table.clone();
+        let schema = SchemaRef::new(table.arrow_schema());
+        let base_url = base_url.to_string();
         Self {
             cnt: 10,
-            schema: SchemaRef::new(Schema::new(vec![
-                Field::new("a", DataType::Int32, false),
-                Field::new("b", DataType::Int32, false),
-            ])),
+            base_url,
+            table,
+            schema,
         }
     }
 }

@@ -1,7 +1,9 @@
 #/bin/bash
 set -e
 
-trap "go run test_server.go" EXIT
+go build test_server.go
+./test_server &
+trap "kill $(jobs -pr)" EXIT
 
 cmake -S . -B build
 cmake --build build
