@@ -1,40 +1,36 @@
+mod batch_stream;
 mod data_model;
 
+use crate::batch_stream::BatchStream;
 use crate::data_model::{DataModel, Table};
-use arrow::array::{ArrayData, ArrayRef, StructArray};
-use arrow::buffer::Buffer;
-use arrow::datatypes::{Field, SchemaRef};
+use arrow::datatypes::SchemaRef;
 use arrow::error::Result;
 use arrow::ffi_stream::FFI_ArrowArrayStream;
 use arrow::record_batch::{RecordBatch, RecordBatchReader};
-use std::cmp::min;
 
 #[no_mangle]
 pub extern "C" fn get_arrow_array_stream() -> FFI_ArrowArrayStream {
     let base_url = "http://localhost:6789";
     let data_model = DataModel::get(base_url).unwrap();
-    let table = data_model.table("transactions").unwrap();
-    FFI_ArrowArrayStream::new(Box::new(IteratorImpl::new(base_url, table)))
+    const TABLE_NAME: &str = "transactions";
+    let table = data_model.table(TABLE_NAME).unwrap();
+    let batch_reader = IteratorImpl::new(base_url, table, TABLE_NAME).unwrap();
+    FFI_ArrowArrayStream::new(Box::new(batch_reader))
 }
 
 struct IteratorImpl {
-    cnt: usize,
-    base_url: String,
-    table: Table,
     schema: SchemaRef,
+    stream: BatchStream,
 }
 
 impl IteratorImpl {
-    fn new(base_url: &str, table: &Table) -> Self {
-        let table = table.clone();
-        let schema = SchemaRef::new(table.arrow_schema());
+    fn new(base_url: &str, table: &Table, table_name: &str) -> anyhow::Result<Self> {
         let base_url = base_url.to_string();
-        Self {
-            cnt: 10,
-            base_url,
-            table,
-            schema,
-        }
+        let stream = BatchStream::start(&base_url, table_name, table)?;
+        Ok(Self {
+            schema: SchemaRef::from(table.arrow_schema()),
+            stream,
+        })
     }
 }
 
@@ -48,25 +44,6 @@ impl Iterator for IteratorImpl {
     type Item = Result<RecordBatch>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.cnt == 0 {
-            return None;
-        }
-        let l = min(self.cnt, 3);
-        let fields: Vec<(Field, ArrayRef)> = self
-            .schema()
-            .fields()
-            .iter()
-            .map(|field| {
-                let buffer = Buffer::from_slice_ref(&[1i32, 2i32, 3i32]);
-                let array_data = ArrayData::builder(field.data_type().clone())
-                    .len(l)
-                    .add_buffer(buffer)
-                    .build()
-                    .unwrap();
-                (field.clone(), ArrayRef::from(array_data))
-            })
-            .collect();
-        self.cnt -= l;
-        Some(Ok(RecordBatch::from(&StructArray::from(fields))))
+        self.stream.next()
     }
 }

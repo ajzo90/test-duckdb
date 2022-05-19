@@ -9,7 +9,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"time"
 )
 
 type Field struct {
@@ -68,12 +67,16 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 	}
 
 	var emitters []func(n int) []byte
-	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rnd := rand.New(rand.NewSource(0))
 
 	staticRandomEmitter := func(size int) func(int) []byte {
 		var buf = make([]byte, size*int(r.Batch))
 		return func(n int) []byte {
 			io.ReadFull(rnd, buf)
+			var leading_zeros = make([]byte,size/2)
+			for i := 0; i<int(r.Batch); i++ {
+			    copy(buf[i*size+size-len(leading_zeros):], leading_zeros)
+			}
 			return buf[:n*size]
 		}
 	}

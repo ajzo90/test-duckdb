@@ -33,6 +33,9 @@ impl Table {
         }
         Schema::new(arrow_fields)
     }
+    pub fn columns(&self) -> &[Column] {
+        &self.columns
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -47,11 +50,17 @@ impl Column {
     pub fn arrow_field(&self) -> Field {
         Field::new(&self.name, self.typ.arrow_data_type(), false)
     }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn typ(&self) -> &Type {
+        &self.typ
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
-enum Type {
+pub enum Type {
     U32,
     U8,
     String,
@@ -63,6 +72,13 @@ impl Type {
             Type::U32 => DataType::UInt32,
             Type::U8 => DataType::UInt8,
             Type::String => DataType::Utf8,
+        }
+    }
+    pub fn element_size(&self) -> usize {
+        match self {
+            Type::U32 => 4,
+            Type::U8 => 1,
+            Type::String => 2,
         }
     }
 }

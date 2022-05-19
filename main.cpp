@@ -28,7 +28,10 @@ int main() {
     params.push_back(duckdb::Value::UBIGINT(1000000));
     auto rel_t = conn.TableFunction("arrow_scan", params)->CreateView("t");
     conn.Query("SET threads TO 1;")->Print();
-    conn.Query("SELECT * FROM t")->Print();
+    conn.Query("SELECT * FROM t LIMIT 10")->Print();
 //    conn.Query("SELECT SUM(u.b) FROM t JOIN t u ON t.b = u.a")->Print();
+    for (std::string line; std::getline(std::cin, line);) {
+        conn.Query(line)->Print();
+    }
     return 0;
 }
