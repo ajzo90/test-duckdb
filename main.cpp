@@ -4,9 +4,8 @@
 #include "duckdb.hpp"
 #include <chrono>
 
-extern "C" {
-    ArrowArrayStream get_arrow_array_stream();
-}
+// run "cargo install cbindgen && cbindgen rust_arrow_client/" for a hint how this line should look if the Rust side changes
+extern "C" ArrowArrayStream get_arrow_array_stream(const char *base_url, const char *table_name);
 
 std::unique_ptr<duckdb::ArrowArrayStreamWrapper>
 CreateStream(uintptr_t, std::pair<std::unordered_map<duckdb::idx_t, duckdb::string>, std::vector<duckdb::string>> &project_columns,
@@ -15,7 +14,7 @@ CreateStream(uintptr_t, std::pair<std::unordered_map<duckdb::idx_t, duckdb::stri
 //        printf("%s\n", i.c_str());
 
     auto stream_wrapper = duckdb::make_unique<duckdb::ArrowArrayStreamWrapper>();
-    stream_wrapper->arrow_array_stream = get_arrow_array_stream();
+    stream_wrapper->arrow_array_stream = get_arrow_array_stream("http://localhost:6789", "users");
     stream_wrapper->number_of_rows = 10000000000;
     return stream_wrapper;
 }

@@ -567,6 +567,7 @@ dependencies = [
  "anyhow",
  "arrow",
  "bytemuck",
+ "libc",
  "serde",
  "serde_json",
  "static_assertions",
