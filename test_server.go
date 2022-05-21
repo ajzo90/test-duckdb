@@ -1,7 +1,7 @@
 package main
 
 import (
-// 	"bufio"
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"sync"
 )
 
 type Field struct {
@@ -55,9 +56,22 @@ func Main() error {
 	}))
 }
 
-var cache []byte
+var cacheLock sync.Mutex
+var cache = make(map[string][]byte)
+var use_cache = true
 
 func handleStreamRequest(_w io.Writer, r *Req) error {
+	var rKeyBytes, _ = json.Marshal(r)
+	var rKey = string(rKeyBytes)
+	if use_cache {
+		cacheLock.Lock()
+		var cachedResponse, exists = cache[rKey]
+		cacheLock.Unlock()
+		if exists {
+			_w.Write(cachedResponse)
+			return nil
+		}
+	}
 
 	fields := model[r.Table]
 	if len(fields) == 0 {
@@ -74,11 +88,11 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 
 	staticRandomEmitter := func(size int) func(int) []byte {
 		var buf = make([]byte, size*int(r.Batch))
-		var leading_zeros = make([]byte,size/2)
+		var leading_zeros = make([]byte, size/2)
 		return func(n int) []byte {
 			io.ReadFull(rnd, buf)
-			for i := 0; i<int(r.Batch); i++ {
-			    copy(buf[i*size+size-len(leading_zeros):], leading_zeros)
+			for i := 0; i < int(r.Batch); i++ {
+				copy(buf[i*size+size-len(leading_zeros):], leading_zeros)
 			}
 			return buf[:n*size]
 		}
@@ -128,12 +142,12 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 
 	var batchSizeBuf [4]byte
 
-// 	w := bufio.NewWriter(_w)
-    if len(cache) != 0 {
-        _w.Write(cache)
-        return nil
-    }
-    w := bytes.NewBuffer(nil)
+	var w io.Writer
+	if use_cache {
+		w = bytes.NewBuffer(nil)
+	} else {
+		w = bufio.NewWriter(_w)
+	}
 
 	for capacity := r.Limit; capacity > 0; {
 		toEmit := r.Batch
@@ -158,8 +172,16 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 		return err
 	}
 
-    cache = w.Bytes()
-    _w.Write(cache)
+	if use_cache {
+		cacheLock.Lock()
+		defer cacheLock.Unlock()
+		var cachedResponse = w.(*bytes.Buffer).Bytes()
+		cache[rKey] = cachedResponse
+		if _, err := _w.Write(cachedResponse); err != nil {
+			return err
+		}
+
+	}
 	return nil
 }
 func main() {
