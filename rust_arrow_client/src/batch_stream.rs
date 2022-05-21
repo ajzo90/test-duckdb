@@ -1,15 +1,19 @@
-use crate::data_model::Column;
+use crate::array::{fixed_size_array, string_array};
+use crate::data_model::{Column, Type};
 use crate::Table;
 use anyhow::bail;
-use arrow::array::{ArrayData, ArrayRef};
-use arrow::buffer::{Buffer, MutableBuffer};
+use arrow::array::ArrayRef;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use serde_json::json;
+use static_assertions::const_assert;
 use std::io::Read;
 
-const MAX_BATCH_LEN: u32 = 100000;
+const MAX_BATCH_LEN: u32 = 1 << 14;
+
+// using i32 string offset arrays impose this batch length limit with max string size of u16::MAX
+const_assert!(MAX_BATCH_LEN as u128 * (u16::MAX as u128) <= i32::MAX as u128);
 
 pub struct BatchStream {
     stream: Box<dyn Read + Send>,
@@ -48,18 +52,10 @@ impl BatchStream {
 
         let mut arrays: Vec<ArrayRef> = Vec::with_capacity(self.columns.len());
         for column in &self.columns {
-            let buffer_size = column.typ().element_size() * batch_len as usize;
-            let mut buffer = MutableBuffer::from_len_zeroed(buffer_size);
-            self.stream.read_exact(buffer.as_mut())?;
-            let array = ArrayData::try_new(
-                column.typ().arrow_data_type(),
-                batch_len as usize,
-                None,
-                None,
-                0,
-                vec![Buffer::from(buffer)],
-                vec![],
-            )?;
+            let array = match column.typ() {
+                Type::String => string_array(&mut self.stream, batch_len),
+                typ => fixed_size_array(&mut self.stream, typ, batch_len),
+            }?;
             arrays.push(ArrayRef::from(array));
         }
         let record_batch = RecordBatch::try_new(self.schema.clone(), arrays)?;

@@ -1,3 +1,4 @@
+mod array;
 mod batch_stream;
 mod data_model;
 
@@ -12,7 +13,7 @@ use arrow::record_batch::{RecordBatch, RecordBatchReader};
 pub extern "C" fn get_arrow_array_stream() -> FFI_ArrowArrayStream {
     let base_url = "http://localhost:6789";
     let data_model = DataModel::get(base_url).unwrap();
-    const TABLE_NAME: &str = "transactions";
+    const TABLE_NAME: &str = "users";
     let table = data_model.table(TABLE_NAME).unwrap();
     let batch_reader = IteratorImpl::new(base_url, table, TABLE_NAME).unwrap();
     FFI_ArrowArrayStream::new(Box::new(batch_reader))
