@@ -20,14 +20,14 @@ type Field struct {
 
 var model = map[string][]Field{
 	"users": {
-		{Name: "id", Type: "u32"},
+		{Name: "id", Type: "i32"},
 		{Name: "age", Type: "u8"},
 		{Name: "name", Type: "string"},
 	},
 	"transactions": {
-		{Name: "id", Type: "u32"},
-		{Name: "user", Type: "u32"},
-		{Name: "item", Type: "u32"},
+		{Name: "id", Type: "u16"},
+		{Name: "user", Type: "i32"},
+		{Name: "item", Type: "i32"},
 	},
 }
 
@@ -88,7 +88,7 @@ func handleStreamRequest(_w io.Writer, r *Req) error {
 
 	staticRandomEmitter := func(size int) func(int) []byte {
 		var buf = make([]byte, size*int(r.Batch))
-		var leading_zeros = make([]byte, size/2)
+		var leading_zeros = make([]byte, 0*size/2)
 		return func(n int) []byte {
 			io.ReadFull(rnd, buf)
 			for i := 0; i < int(r.Batch); i++ {

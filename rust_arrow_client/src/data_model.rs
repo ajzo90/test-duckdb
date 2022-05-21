@@ -62,7 +62,11 @@ impl Column {
 #[serde(rename_all = "lowercase")]
 pub enum Type {
     U32,
+    U16,
     U8,
+    I32,
+    I16,
+    I8,
     String,
 }
 
@@ -70,14 +74,19 @@ impl Type {
     pub fn arrow_data_type(&self) -> DataType {
         match self {
             Type::U32 => DataType::UInt32,
+            Type::I32 => DataType::Int32,
+            Type::U16 => DataType::UInt16,
+            Type::I16 => DataType::Int16,
             Type::U8 => DataType::UInt8,
+            Type::I8 => DataType::Int8,
             Type::String => DataType::Utf8,
         }
     }
     pub fn element_size(&self) -> usize {
         match self {
-            Type::U32 => 4,
-            Type::U8 => 1,
+            Type::U32 | Type::I32 => 4,
+            Type::U16 | Type::I16 => 2,
+            Type::U8 | Type::I8 => 1,
             Type::String => 2,
         }
     }
@@ -105,6 +114,6 @@ mod tests {
             }
         "#,
         )
-        .unwrap();
+            .unwrap();
     }
 }

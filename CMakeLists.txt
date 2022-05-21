@@ -71,6 +71,6 @@ target_link_libraries(arrow_duckdb_test PRIVATE
         duckdb_static
 #        ${install_arrow}/lib64/libarrow.a
         rust_arrow_client
-        -fsanitize=address
-        -fsanitize=undefined
+#        -fsanitize=address
+#        -fsanitize=undefined
         )
