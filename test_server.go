@@ -21,13 +21,13 @@ type Field struct {
 var model = map[string][]Field{
 	"users": {
 		{Name: "id", Type: "i32"},
-		{Name: "age", Type: "u8"},
+		{Name: "age", Type: "i8"},
 		{Name: "name", Type: "string"},
 	},
 	"transactions": {
-		{Name: "id", Type: "u16"},
-		{Name: "user", Type: "i32"},
-		{Name: "item", Type: "i32"},
+		{Name: "id", Type: "i32"},
+// 		{Name: "user", Type: "i32"},
+// 		{Name: "item", Type: "i32"},
 	},
 }
 

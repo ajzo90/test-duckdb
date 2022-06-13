@@ -10,6 +10,7 @@ use crate::batch_stream::BatchStream;
 use crate::data_model::{DataModel, Table};
 use arrow::datatypes::SchemaRef;
 use arrow::error::Result;
+use arrow::ffi::FFI_ArrowSchema;
 use arrow::ffi_stream::FFI_ArrowArrayStream;
 use arrow::record_batch::{RecordBatch, RecordBatchReader};
 
@@ -19,12 +20,21 @@ pub extern "C" fn get_arrow_array_stream(base_url: *const c_char, table_name: *c
         (CStr::from_ptr(base_url).to_str().unwrap(),
          CStr::from_ptr(table_name).to_str().unwrap())
     };
-    // let base_url = "http://localhost:6789";
     let data_model = DataModel::get(base_url).unwrap();
-    // const TABLE_NAME: &str = "users";
     let table = data_model.table(table_name).unwrap();
     let batch_reader = IteratorImpl::new(&base_url, table, table_name).unwrap();
     FFI_ArrowArrayStream::new(Box::new(batch_reader))
+}
+
+#[no_mangle]
+pub extern "C" fn get_arrow_array_schema(base_url: *const c_char, table_name: *const c_char) -> FFI_ArrowSchema {
+    let (base_url, table_name) = unsafe {
+        (CStr::from_ptr(base_url).to_str().unwrap(),
+         CStr::from_ptr(table_name).to_str().unwrap())
+    };
+    let data_model = DataModel::get(base_url).unwrap();
+    let table = data_model.table(table_name).unwrap();
+    FFI_ArrowSchema::try_from(table.arrow_schema()).unwrap()
 }
 
 struct IteratorImpl {
