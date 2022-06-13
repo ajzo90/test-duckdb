@@ -26,8 +26,8 @@ var model = map[string][]Field{
 	},
 	"transactions": {
 		{Name: "id", Type: "i32"},
-// 		{Name: "user", Type: "i32"},
-// 		{Name: "item", Type: "i32"},
+		{Name: "user", Type: "i32"},
+		{Name: "item", Type: "u32"},
 	},
 }
 

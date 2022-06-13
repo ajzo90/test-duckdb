@@ -3,7 +3,7 @@ use crate::data_model::{Column, Type};
 use crate::Table;
 use anyhow::bail;
 use arrow::array::ArrayRef;
-use arrow::datatypes::SchemaRef;
+use arrow::datatypes::{Schema, SchemaRef};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use serde_json::json;
@@ -22,10 +22,15 @@ pub struct BatchStream {
 }
 
 impl BatchStream {
-    pub fn start(base_url: &str, table_name: &str, table: &Table) -> anyhow::Result<Self> {
+    pub fn start(
+        base_url: &str,
+        table_name: &str,
+        columns: Vec<Column>,
+        column_names: &[&str],
+    ) -> anyhow::Result<Self> {
         let url = base_url.to_string() + "/data-stream";
-        let columns = table.columns().to_vec();
-        let column_names: Vec<&str> = columns.iter().map(|c| c.name()).collect();
+        let schema = Schema::new(columns.iter().map(|c| c.arrow_field()).collect());
+
         let response = ureq::post(&url).send_json(&json!({
             "table": table_name,
             "fields": column_names,
@@ -37,7 +42,7 @@ impl BatchStream {
         Ok(Self {
             stream: Box::new(response.into_reader()),
             columns,
-            schema: SchemaRef::new(table.arrow_schema()),
+            schema: SchemaRef::new(schema),
         })
     }
     fn read_batch(&mut self) -> anyhow::Result<RecordBatch> {
@@ -50,7 +55,7 @@ impl BatchStream {
             bail!("max batch len exceeded")
         }
 
-        let mut arrays: Vec<ArrayRef> = Vec::with_capacity(self.columns.len());
+        let mut arrays: Vec<ArrayRef> = Vec::with_capacity(self.schema.fields().len());
         for column in &self.columns {
             let array = match column.typ() {
                 Type::String => string_array(&mut self.stream, batch_len),

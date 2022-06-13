@@ -36,6 +36,13 @@ impl Table {
     pub fn columns(&self) -> &[Column] {
         &self.columns
     }
+    pub fn column(&self, name: &str) -> &Column {
+        self.columns
+            .iter()
+            .filter(|c| c.name() == name)
+            .next()
+            .unwrap()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -114,6 +121,6 @@ mod tests {
             }
         "#,
         )
-            .unwrap();
+        .unwrap();
     }
 }
