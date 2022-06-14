@@ -27,10 +27,8 @@ FetchContent_MakeAvailable(Corrosion)
 corrosion_import_crate(MANIFEST_PATH rust_arrow_client/Cargo.toml)
 
 add_executable(arrow_duckdb_test main.cpp)
-target_link_libraries(arrow_duckdb_test PRIVATE
-        duckdb_static
-        rust_arrow_client
-#        -fsanitize=address
-#        -fsanitize=undefined
-        "-framework Security"
-        )
+if (APPLE)
+    target_link_libraries(arrow_duckdb_test PRIVATE duckdb_static rust_arrow_client "-framework Security")
+else()
+    target_link_libraries(arrow_duckdb_test PRIVATE duckdb_static rust_arrow_client)
+endif()
