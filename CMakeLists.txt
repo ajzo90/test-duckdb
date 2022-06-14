@@ -1,3 +1,6 @@
+#set(Rust_TOOLCHAIN stable-aarch64-apple-darwin)
+set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE INTERNAL "" FORCE)
+
 include(FetchContent)
 include(ExternalProject)
 
@@ -29,4 +32,5 @@ target_link_libraries(arrow_duckdb_test PRIVATE
         rust_arrow_client
 #        -fsanitize=address
 #        -fsanitize=undefined
+        "-framework Security"
         )
